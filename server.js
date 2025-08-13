@@ -1,4 +1,3 @@
-// medx-render-api: returns fully rendered HTML for a given URL
 import express from "express";
 import cors from "cors";
 import { chromium } from "playwright";
@@ -7,7 +6,6 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
 
-// Optional bearer token (set AUTH_TOKEN in Render env)
 const AUTH_TOKEN = process.env.AUTH_TOKEN || null;
 app.use((req, res, next) => {
   if (!AUTH_TOKEN) return next();
@@ -16,40 +14,28 @@ app.use((req, res, next) => {
   return res.status(401).json({ error: "Unauthorized" });
 });
 
-// Health
 app.get("/", (_, res) => res.type("text").send("OK"));
 app.get("/healthz", (_, res) => res.json({ ok: true }));
 
-/**
- * GET /render?url=<https://...>&wait=<ms>&selector=<css>
- */
 app.get("/render", async (req, res) => {
   const url = req.query.url;
-  if (!url || typeof url !== "string") {
-    return res.status(400).json({ error: "Missing url param" });
-  }
-  const extraWaitMs = Math.min(Math.max(parseInt(String(req.query.wait || "0"), 10) || 0, 0), 15000);
+  if (!url || typeof url !== "string") return res.status(400).json({ error: "Missing url param" });
+  const wait = Math.min(Math.max(parseInt(String(req.query.wait || "0"), 10) || 0, 0), 15000);
   const selector = typeof req.query.selector === "string" ? req.query.selector : null;
 
   let browser;
   try {
-    browser = await chromium.launch({ args: ["--no-sandbox", "--disable-setuid-sandbox"] });
-
+    browser = await chromium.launch({ args: ["--no-sandbox","--disable-setuid-sandbox"] });
     const ctx = await browser.newContext({
       userAgent: "Mozilla/5.0 (compatible; MedicalExRender/1.0)",
       javaScriptEnabled: true,
       viewport: { width: 1366, height: 768 }
     });
-
     const page = await ctx.newPage();
     await page.goto(url, { waitUntil: "load", timeout: 45000 });
-
-    if (selector) {
-      await page.waitForSelector(selector, { timeout: 20000 }).catch(() => {});
-    }
-    await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
-    if (extraWaitMs > 0) await page.waitForTimeout(extraWaitMs);
-
+    if (selector) await page.waitForSelector(selector, { timeout: 20000 }).catch(()=>{});
+    await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(()=>{});
+    if (wait > 0) await page.waitForTimeout(wait);
     const html = await page.content();
     res.status(200).type("text/html").send(html);
   } catch (e) {
