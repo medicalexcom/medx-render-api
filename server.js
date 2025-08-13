@@ -1,10 +1,15 @@
 import express from "express";
 import cors from "cors";
-import { chromium } from "playwright";
+import fetch from "node-fetch";
+import * as cheerio from "cheerio";
 
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
+
+// Health & root
+app.get("/", (_, res) => res.type("text").send("ingest-api OK"));
+app.get("/healthz", (_, res) => res.json({ ok: true }));
 
 const AUTH_TOKEN = process.env.AUTH_TOKEN || null;
 app.use((req, res, next) => {
